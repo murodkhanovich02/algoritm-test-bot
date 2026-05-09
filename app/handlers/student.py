@@ -8,12 +8,14 @@ from app.database.session import AsyncSessionLocal
 from app.keyboards.main import BTN_BACK, BTN_TEST_START, back_menu, main_menu
 from app.repositories.result_repository import ResultRepository
 from app.repositories.test_repository import TestRepository
+from app.services.admin_service import is_admin_user
 from app.services.test_checker import (
     build_student_result_text,
     check_test_answers,
     details_to_json,
 )
 from app.states.student_states import StudentTestState
+from app.utils.time_format import format_time_limit
 from app.utils.validators import (
     escape_html,
     is_valid_answer,
@@ -82,9 +84,11 @@ async def finish_test_by_timeout(
         is_timeout=True,
     )
 
+    is_admin = await is_admin_user(message.from_user.id)
+
     await message.answer(
         text=result_text,
-        reply_markup=main_menu(message.from_user.id),
+        reply_markup=main_menu(message.from_user.id, is_admin=is_admin),
     )
 
 
@@ -128,9 +132,11 @@ async def student_test_start(message: Message, state: FSMContext) -> None:
 async def student_enter_full_name(message: Message, state: FSMContext) -> None:
     if message.text == BTN_BACK:
         await state.clear()
+        is_admin = await is_admin_user(message.from_user.id)
+
         await message.answer(
             text="Asosiy menyu",
-            reply_markup=main_menu(message.from_user.id),
+            reply_markup=main_menu(message.from_user.id, is_admin=is_admin),
         )
         return
 
@@ -162,9 +168,11 @@ async def student_enter_full_name(message: Message, state: FSMContext) -> None:
 async def student_enter_test_code(message: Message, state: FSMContext) -> None:
     if message.text == BTN_BACK:
         await state.clear()
+        is_admin = await is_admin_user(message.from_user.id)
+
         await message.answer(
             text="Asosiy menyu",
-            reply_markup=main_menu(message.from_user.id),
+            reply_markup=main_menu(message.from_user.id, is_admin=is_admin),
         )
         return
 
@@ -175,9 +183,11 @@ async def student_enter_test_code(message: Message, state: FSMContext) -> None:
 
     if not full_name:
         await state.clear()
+        is_admin = await is_admin_user(message.from_user.id)
+
         await message.answer(
             "❌ Ism-familiya topilmadi. Testni qaytadan boshlang.",
-            reply_markup=main_menu(message.from_user.id),
+            reply_markup=main_menu(message.from_user.id, is_admin=is_admin),
         )
         return
 
@@ -199,10 +209,12 @@ async def student_enter_test_code(message: Message, state: FSMContext) -> None:
 
     if existing_result:
         await state.clear()
+        is_admin = await is_admin_user(message.from_user.id)
+
         await message.answer(
             "⛔ Siz bu testni avval ishlagansiz.\n\n"
             "Bitta test kodini faqat <b>1 marta</b> ishlash mumkin.",
-            reply_markup=main_menu(message.from_user.id),
+            reply_markup=main_menu(message.from_user.id, is_admin=is_admin),
         )
         return
 
@@ -233,7 +245,7 @@ async def student_enter_test_code(message: Message, state: FSMContext) -> None:
             f"👤 <b>O‘quvchi:</b> {escape_html(full_name)}\n"
             f"🧪 <b>Test kodi:</b> <code>{test.test_code}</code>\n"
             f"📌 <b>Savollar soni:</b> {test.question_count} ta\n"
-            f"⏱ <b>Vaqt:</b> {test.time_limit_seconds} sekund\n\n"
+            f"⏱ <b>Vaqt:</b> {format_time_limit(test.time_limit_seconds)}\n\n"
             "Endi PDF savollar yuboriladi."
         )
     )
@@ -297,9 +309,11 @@ async def student_enter_answer(message: Message, state: FSMContext) -> None:
 
     if existing_result:
         await state.clear()
+        is_admin = await is_admin_user(message.from_user.id)
+
         await message.answer(
             "⛔ Bu test bo‘yicha natijangiz allaqachon saqlangan.",
-            reply_markup=main_menu(message.from_user.id),
+            reply_markup=main_menu(message.from_user.id, is_admin=is_admin),
         )
         return
 
@@ -331,9 +345,11 @@ async def student_enter_answer(message: Message, state: FSMContext) -> None:
 
         if existing_result:
             await state.clear()
+            is_admin = await is_admin_user(message.from_user.id)
+
             await message.answer(
                 "⛔ Bu test bo‘yicha natijangiz allaqachon saqlangan.",
-                reply_markup=main_menu(message.from_user.id),
+                reply_markup=main_menu(message.from_user.id, is_admin=is_admin),
             )
             return
 
@@ -362,7 +378,9 @@ async def student_enter_answer(message: Message, state: FSMContext) -> None:
         is_timeout=False,
     )
 
+    is_admin = await is_admin_user(message.from_user.id)
+
     await message.answer(
         text=result_text,
-        reply_markup=main_menu(message.from_user.id),
+        reply_markup=main_menu(message.from_user.id, is_admin=is_admin),
     )

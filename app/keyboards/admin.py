@@ -6,9 +6,43 @@ from aiogram.types import (
 )
 
 from app.keyboards.main import BTN_BACK
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+
+BTN_TEST_START = "🧪 Test topshirish"
+BTN_ADMIN_PANEL = "⚙️ Admin panel"
+BTN_BACK = "🔙 Orqaga"
 
 
-BTN_CREATE_TEST = "📄 PDF test qo‘shish"
+def main_menu(
+        user_id: int,
+        is_admin: bool = False,
+) -> ReplyKeyboardMarkup:
+    if is_admin:
+        keyboard = [
+            [KeyboardButton(text=BTN_ADMIN_PANEL)],
+        ]
+    else:
+        keyboard = [
+            [KeyboardButton(text=BTN_TEST_START)],
+        ]
+
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True,
+        input_field_placeholder="Kerakli bo‘limni tanlang",
+    )
+
+
+def back_menu() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_BACK)],
+        ],
+        resize_keyboard=True,
+    )
+
+
+BTN_CREATE_TEST = "📄 Test qo‘shish"
 BTN_TEST_LIST = "📋 Testlar ro‘yxati"
 BTN_RESULTS = "📊 Natijalar"
 
@@ -41,20 +75,20 @@ def time_limit_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="20 sekund", callback_data="test_time:20"),
-                InlineKeyboardButton(text="30 sekund", callback_data="test_time:30"),
+                InlineKeyboardButton(text="20 minut", callback_data="test_time:1200"),
+                InlineKeyboardButton(text="30 minut", callback_data="test_time:1800"),
             ],
             [
-                InlineKeyboardButton(text="40 sekund", callback_data="test_time:40"),
-                InlineKeyboardButton(text="50 sekund", callback_data="test_time:50"),
+                InlineKeyboardButton(text="40 minut", callback_data="test_time:2400"),
+                InlineKeyboardButton(text="50 minut", callback_data="test_time:3000"),
             ],
             [
-                InlineKeyboardButton(text="60 sekund", callback_data="test_time:60"),
-                InlineKeyboardButton(text="70 sekund", callback_data="test_time:70"),
+                InlineKeyboardButton(text="60 minut", callback_data="test_time:3600"),
+                InlineKeyboardButton(text="70 minut", callback_data="test_time:4200"),
             ],
             [
-                InlineKeyboardButton(text="80 sekund", callback_data="test_time:80"),
-                InlineKeyboardButton(text="90 sekund", callback_data="test_time:90"),
+                InlineKeyboardButton(text="80 minut", callback_data="test_time:4800"),
+                InlineKeyboardButton(text="90 minut", callback_data="test_time:5400"),
             ],
         ]
     )
@@ -97,6 +131,55 @@ def test_delete_confirm_keyboard(test_id: int) -> InlineKeyboardMarkup:
                     text="❌ Yo‘q, qaytish",
                     callback_data="delete_test_no",
                 ),
+            ]
+        ]
+    )
+
+
+def student_results_keyboard(results: list, test_code: str) -> InlineKeyboardMarkup:
+    keyboard = []
+
+    for result in results:
+        total = result.correct_count + result.wrong_count
+
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    text=f"👤 {result.full_name} — {result.correct_count}/{total}",
+                    callback_data=f"student_result:{result.id}",
+                )
+            ]
+        )
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                text="📄 PDF hisobot",
+                callback_data=f"results_pdf:{test_code}",
+            )
+        ]
+    )
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                text="🔙 Admin panel",
+                callback_data="admin_back",
+            )
+        ]
+    )
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def student_result_back_keyboard(test_code: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔙 O‘quvchilar ro‘yxatiga qaytish",
+                    callback_data=f"back_results:{test_code}",
+                )
             ]
         ]
     )

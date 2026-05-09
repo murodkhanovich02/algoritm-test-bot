@@ -63,7 +63,11 @@ def build_student_result_text(
 ) -> str:
     details = result["details"]
 
-    title = "⏰ <b>Vaqt tugadi. Test avtomatik yakunlandi.</b>" if is_timeout else "✅ <b>Test natijasi tayyor</b>"
+    title = (
+        "⏰ <b>Vaqt tugadi. Test avtomatik yakunlandi.</b>"
+        if is_timeout
+        else "✅ <b>Test natijasi tayyor</b>"
+    )
 
     lines = [
         title,

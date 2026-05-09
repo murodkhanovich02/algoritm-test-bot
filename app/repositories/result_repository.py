@@ -51,6 +51,15 @@ class ResultRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_result_by_id(
+        session: AsyncSession,
+        result_id: int,
+    ) -> StudentResult | None:
+        stmt = select(StudentResult).where(StudentResult.id == result_id)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_results_by_test_code(
         session: AsyncSession,
         test_code: str,

@@ -10,15 +10,18 @@ def main_menu(
     user_id: int,
     is_admin: bool = False,
 ) -> ReplyKeyboardMarkup:
-    buttons = [
-        [KeyboardButton(text=BTN_TEST_START)]
-    ]
 
     if is_admin:
-        buttons.append([KeyboardButton(text=BTN_ADMIN_PANEL)])
+        keyboard = [
+            [KeyboardButton(text=BTN_ADMIN_PANEL)],
+        ]
+    else:
+        keyboard = [
+            [KeyboardButton(text=BTN_TEST_START)],
+        ]
 
     return ReplyKeyboardMarkup(
-        keyboard=buttons,
+        keyboard=keyboard,
         resize_keyboard=True,
         input_field_placeholder="Kerakli bo‘limni tanlang",
     )
@@ -27,7 +30,7 @@ def main_menu(
 def back_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_BACK)]
+            [KeyboardButton(text=BTN_BACK)],
         ],
         resize_keyboard=True,
     )

@@ -1,6 +1,6 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from app.config import settings
 from app.database.session import AsyncSessionLocal
@@ -12,6 +12,8 @@ from app.keyboards.admin import (
     BTN_RESULTS,
     BTN_TEST_LIST,
     admin_menu,
+    student_result_back_keyboard,
+    student_results_keyboard,
     test_delete_confirm_keyboard,
     tests_list_keyboard,
     time_limit_keyboard,
@@ -21,7 +23,10 @@ from app.repositories.admin_repository import AdminRepository
 from app.repositories.result_repository import ResultRepository
 from app.repositories.test_repository import TestRepository
 from app.services.admin_service import is_admin_user
+from app.services.pdf_report import generate_results_pdf
+from app.services.test_checker import details_from_json
 from app.states.admin_states import AdminResultState, CreateTestState, ManageAdminState
+from app.utils.time_format import format_time_limit
 from app.utils.validators import (
     is_valid_answer,
     is_valid_question_count,
@@ -56,10 +61,7 @@ async def create_test_start(message: Message, state: FSMContext) -> None:
 async def create_test_pdf(message: Message, state: FSMContext) -> None:
     if message.text == BTN_BACK:
         await state.clear()
-        await message.answer(
-            text="Admin panel",
-            reply_markup=admin_menu(),
-        )
+        await message.answer("Admin panel", reply_markup=admin_menu())
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -104,10 +106,7 @@ async def create_test_pdf(message: Message, state: FSMContext) -> None:
 async def create_test_code(message: Message, state: FSMContext) -> None:
     if message.text == BTN_BACK:
         await state.clear()
-        await message.answer(
-            text="Admin panel",
-            reply_markup=admin_menu(),
-        )
+        await message.answer("Admin panel", reply_markup=admin_menu())
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -137,10 +136,7 @@ async def create_test_code(message: Message, state: FSMContext) -> None:
     await state.set_state(CreateTestState.waiting_for_time_limit)
 
     await message.answer(
-        text=(
-            "⏱ <b>Test vaqtini tanlang.</b>\n\n"
-            "Hozircha qiymatlar <b>sekund</b> sifatida ishlaydi."
-        ),
+        text="⏱ <b>Test vaqtini tanlang.</b>",
         reply_markup=time_limit_keyboard(),
     )
 
@@ -167,7 +163,7 @@ async def create_test_time_limit(callback: CallbackQuery, state: FSMContext) -> 
 
     await callback.message.edit_text(
         text=(
-            f"✅ Test vaqti tanlandi: <b>{time_limit_seconds} sekund</b>\n\n"
+            f"✅ Test vaqti tanlandi: <b>{format_time_limit(time_limit_seconds)}</b>\n\n"
             "📌 <b>Endi testlar sonini kiriting.</b>\n\n"
             "Masalan: <code>30</code>"
         )
@@ -180,10 +176,7 @@ async def create_test_time_limit(callback: CallbackQuery, state: FSMContext) -> 
 async def create_test_question_count(message: Message, state: FSMContext) -> None:
     if message.text == BTN_BACK:
         await state.clear()
-        await message.answer(
-            text="Admin panel",
-            reply_markup=admin_menu(),
-        )
+        await message.answer("Admin panel", reply_markup=admin_menu())
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -219,10 +212,7 @@ async def create_test_question_count(message: Message, state: FSMContext) -> Non
 async def create_test_answer(message: Message, state: FSMContext) -> None:
     if message.text == BTN_BACK:
         await state.clear()
-        await message.answer(
-            text="Admin panel",
-            reply_markup=admin_menu(),
-        )
+        await message.answer("Admin panel", reply_markup=admin_menu())
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -256,9 +246,7 @@ async def create_test_answer(message: Message, state: FSMContext) -> None:
             answers=answers,
         )
 
-        await message.answer(
-            text=f"{next_question}-kalitni kiriting:"
-        )
+        await message.answer(text=f"{next_question}-kalitni kiriting:")
         return
 
     answer_key = "".join(answers)
@@ -283,7 +271,7 @@ async def create_test_answer(message: Message, state: FSMContext) -> None:
             "✅ <b>Test muvaffaqiyatli yaratildi.</b>\n\n"
             f"📄 <b>PDF:</b> {data['pdf_file_name']}\n"
             f"🧪 <b>Test kodi:</b> <code>{test_code}</code>\n"
-            f"⏱ <b>Vaqt:</b> {data['time_limit_seconds']} sekund\n"
+            f"⏱ <b>Vaqt:</b> {format_time_limit(data['time_limit_seconds'])}\n"
             f"📌 <b>Savollar soni:</b> {question_count} ta\n"
             f"🔑 <b>Kalitlar:</b> <code>{answer_key}</code>"
         ),
@@ -343,7 +331,7 @@ async def show_test_delete_confirm(callback: CallbackQuery) -> None:
             "⚠️ <b>Testni o‘chirish</b>\n\n"
             f"🧪 <b>Test kodi:</b> <code>{test.test_code}</code>\n"
             f"📌 <b>Savollar soni:</b> {test.question_count} ta\n"
-            f"⏱ <b>Vaqt:</b> {test.time_limit_seconds} sekund\n"
+            f"⏱ <b>Vaqt:</b> {format_time_limit(test.time_limit_seconds)}\n"
             f"{pdf_status}\n"
             f"Holat: {status}\n\n"
             "Shu test o‘chirilsinmi?"
@@ -457,10 +445,7 @@ async def result_start(message: Message, state: FSMContext) -> None:
 async def show_results_by_code(message: Message, state: FSMContext) -> None:
     if message.text == BTN_BACK:
         await state.clear()
-        await message.answer(
-            text="Admin panel",
-            reply_markup=admin_menu(),
-        )
+        await message.answer("Admin panel", reply_markup=admin_menu())
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -493,28 +478,175 @@ async def show_results_by_code(message: Message, state: FSMContext) -> None:
         )
         return
 
+    await message.answer(
+        text=(
+            f"📊 <b>Test natijalari:</b> <code>{test_code}</code>\n\n"
+            f"📌 <b>Savollar soni:</b> {test.question_count} ta\n"
+            f"⏱ <b>Vaqt:</b> {format_time_limit(test.time_limit_seconds)}\n\n"
+            "Batafsil ko‘rish uchun o‘quvchini tanlang:"
+        ),
+        reply_markup=student_results_keyboard(results, test_code),
+    )
+
+
+@router.callback_query(F.data.startswith("student_result:"))
+async def show_student_result_detail(callback: CallbackQuery) -> None:
+    if not await is_admin_user(callback.from_user.id):
+        await callback.answer("Siz admin emassiz.", show_alert=True)
+        return
+
+    result_id_raw = callback.data.split(":")[1]
+
+    if not result_id_raw.isdigit():
+        await callback.answer("Natija ID noto‘g‘ri.", show_alert=True)
+        return
+
+    result_id = int(result_id_raw)
+
+    async with AsyncSessionLocal() as session:
+        result = await ResultRepository.get_result_by_id(session, result_id)
+
+        if not result:
+            await callback.message.edit_text("❌ Natija topilmadi.")
+            await callback.answer()
+            return
+
+        test = await TestRepository.get_by_id(session, result.test_id)
+
+    if not test:
+        await callback.message.edit_text("❌ Test topilmadi.")
+        await callback.answer()
+        return
+
+    details = details_from_json(result.answers_detail)
+
     lines = [
-        f"📊 <b>Test natijalari:</b> <code>{test_code}</code>",
-        f"📌 <b>Savollar soni:</b> {test.question_count} ta",
-        f"⏱ <b>Vaqt:</b> {test.time_limit_seconds} sekund",
+        "👤 <b>O‘quvchi natijasi</b>",
         "",
+        f"👤 <b>F.I.Sh:</b> {result.full_name}",
+        f"🧪 <b>Test kodi:</b> <code>{test.test_code}</code>",
+        f"📌 <b>Jami savol:</b> {test.question_count} ta",
+        f"⏱ <b>Vaqt:</b> {format_time_limit(test.time_limit_seconds)}",
+        f"✅ <b>To‘g‘ri:</b> {result.correct_count} ta",
+        f"❌ <b>Xato:</b> {result.wrong_count} ta",
+        f"📊 <b>Foiz:</b> {result.percentage}%",
+        "",
+        "📋 <b>Barcha javoblar:</b>",
     ]
 
-    for index, result in enumerate(results, start=1):
-        username = f"@{result.telegram_username}" if result.telegram_username else "username yo‘q"
+    for item in details:
+        icon = "✅" if item["is_correct"] else "❌"
+
+        if item.get("is_unanswered"):
+            student_answer = "javob berilmagan"
+        else:
+            student_answer = item["student_answer"]
 
         lines.append(
-            f"{index}. <b>{result.full_name}</b>\n"
-            f"   👤 Telegram: {username}\n"
-            f"   ✅ Natija: {result.correct_count}/{test.question_count}\n"
-            f"   ❌ Xato: {result.wrong_count} ta\n"
-            f"   📊 Foiz: {result.percentage}%"
+            f"{item['question']}-savol: {student_answer} {icon}"
         )
 
-    await message.answer(
-        text="\n\n".join(lines),
-        reply_markup=admin_menu(),
+    wrong_items = [item for item in details if not item["is_correct"]]
+
+    if wrong_items:
+        lines.append("")
+        lines.append("❌ <b>Adashgan savollari:</b>")
+
+        for item in wrong_items:
+            if item.get("is_unanswered"):
+                lines.append(
+                    f"{item['question']}-savol: javob berilmagan, "
+                    f"to‘g‘ri javob {item['correct_answer']}"
+                )
+            else:
+                lines.append(
+                    f"{item['question']}-savol: "
+                    f"o‘quvchi {item['student_answer']} belgilagan, "
+                    f"to‘g‘ri javob {item['correct_answer']}"
+                )
+    else:
+        lines.append("")
+        lines.append("✅ <b>Xato savollar yo‘q.</b>")
+
+    await callback.message.edit_text(
+        text="\n".join(lines),
+        reply_markup=student_result_back_keyboard(test.test_code),
     )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("back_results:"))
+async def back_to_student_results(callback: CallbackQuery) -> None:
+    if not await is_admin_user(callback.from_user.id):
+        await callback.answer("Siz admin emassiz.", show_alert=True)
+        return
+
+    test_code = callback.data.split(":", 1)[1]
+
+    async with AsyncSessionLocal() as session:
+        test = await TestRepository.get_by_code(session, test_code)
+
+        if not test:
+            await callback.message.edit_text("❌ Test topilmadi.")
+            await callback.answer()
+            return
+
+        results = await ResultRepository.get_results_by_test_code(session, test_code)
+
+    if not results:
+        await callback.message.edit_text(
+            f"📊 <b>Test:</b> <code>{test_code}</code>\n\n"
+            "Bu test bo‘yicha natijalar mavjud emas."
+        )
+        await callback.answer()
+        return
+
+    await callback.message.edit_text(
+        text=(
+            f"📊 <b>Test natijalari:</b> <code>{test_code}</code>\n\n"
+            f"📌 <b>Savollar soni:</b> {test.question_count} ta\n"
+            f"⏱ <b>Vaqt:</b> {format_time_limit(test.time_limit_seconds)}\n\n"
+            "Batafsil ko‘rish uchun o‘quvchini tanlang:"
+        ),
+        reply_markup=student_results_keyboard(results, test_code),
+    )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("results_pdf:"))
+async def send_results_pdf(callback: CallbackQuery) -> None:
+    if not await is_admin_user(callback.from_user.id):
+        await callback.answer("Siz admin emassiz.", show_alert=True)
+        return
+
+    test_code = callback.data.split(":", 1)[1]
+
+    async with AsyncSessionLocal() as session:
+        test = await TestRepository.get_by_code(session, test_code)
+
+        if not test:
+            await callback.answer("Test topilmadi.", show_alert=True)
+            return
+
+        results = await ResultRepository.get_results_by_test_code(
+            session=session,
+            test_code=test_code,
+        )
+
+    if not results:
+        await callback.answer("Natijalar mavjud emas.", show_alert=True)
+        return
+
+    pdf_path = generate_results_pdf(test, results)
+
+    await callback.message.answer_document(
+        document=FSInputFile(pdf_path),
+        caption=f"📄 <b>Test natijalari PDF:</b> <code>{test_code}</code>",
+    )
+
+    await callback.answer("PDF yuborildi.")
 
 
 @router.message(F.text == BTN_ADD_ADMIN)
@@ -557,7 +689,7 @@ async def add_admin_finish(message: Message, state: FSMContext) -> None:
     if new_admin_id in settings.admin_ids:
         await state.clear()
         await message.answer(
-            "⚠️ Bu user allaqachon .env orqali admin qilingan.",
+            "⚠️ Bu userni o'chirish mumkin emas",
             reply_markup=admin_menu(),
         )
         return
@@ -599,16 +731,21 @@ async def show_admin_list(message: Message) -> None:
     async with AsyncSessionLocal() as session:
         db_admins = await AdminRepository.get_all_admins(session)
 
+    is_env_admin = message.from_user.id in settings.admin_ids
+
     lines = [
         "👥 <b>Adminlar ro‘yxati</b>",
         "",
-        "📌 <b>.env orqali berilgan adminlar:</b>",
     ]
 
-    for index, admin_id in enumerate(settings.admin_ids, start=1):
-        lines.append(f"{index}. <code>{admin_id}</code>")
+    if is_env_admin:
+        lines.append("📌 <b>.env orqali berilgan adminlar:</b>")
 
-    lines.append("")
+        for index, admin_id in enumerate(settings.admin_ids, start=1):
+            lines.append(f"{index}. <code>{admin_id}</code>")
+
+        lines.append("")
+
     lines.append("📌 <b>Bot orqali qo‘shilgan adminlar:</b>")
 
     if not db_admins:
