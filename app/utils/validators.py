@@ -1,7 +1,7 @@
 import re
 
 
-ALLOWED_ANSWERS = {"A", "B", "C", "D"}
+ALLOWED_ANSWERS = {"A", "B", "C", "D", "E"}
 
 
 def normalize_text(value: str) -> str:

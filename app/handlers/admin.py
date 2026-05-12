@@ -39,6 +39,63 @@ from app.utils.validators import (
 router = Router()
 
 
+ADMIN_MENU_BUTTONS = {
+    BTN_CREATE_TEST,
+    BTN_TEST_LIST,
+    BTN_RESULTS,
+    BTN_ADD_ADMIN,
+    BTN_ADMIN_LIST,
+    BTN_DELETE_ADMIN,
+    BTN_BACK,
+}
+
+
+async def handle_admin_menu_button(message: Message, state: FSMContext) -> bool:
+    """
+    Admin qaysi state ichida bo‘lsa ham,
+    admin paneldagi button bosilganda eski state tozalanadi
+    va kerakli bo‘lim ochiladi.
+    """
+    if message.text not in ADMIN_MENU_BUTTONS:
+        return False
+
+    if not await is_admin_user(message.from_user.id):
+        await message.answer("⛔ Siz admin emassiz.")
+        return True
+
+    await state.clear()
+
+    if message.text == BTN_BACK:
+        await message.answer("⚙️ Admin panel", reply_markup=admin_menu())
+        return True
+
+    if message.text == BTN_CREATE_TEST:
+        await create_test_start(message, state)
+        return True
+
+    if message.text == BTN_TEST_LIST:
+        await show_test_list(message, state)
+        return True
+
+    if message.text == BTN_RESULTS:
+        await result_start(message, state)
+        return True
+
+    if message.text == BTN_ADD_ADMIN:
+        await add_admin_start(message, state)
+        return True
+
+    if message.text == BTN_ADMIN_LIST:
+        await show_admin_list(message, state)
+        return True
+
+    if message.text == BTN_DELETE_ADMIN:
+        await delete_admin_start(message, state)
+        return True
+
+    return False
+
+
 @router.message(F.text == BTN_CREATE_TEST)
 async def create_test_start(message: Message, state: FSMContext) -> None:
     if not await is_admin_user(message.from_user.id):
@@ -59,9 +116,7 @@ async def create_test_start(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateTestState.waiting_for_pdf)
 async def create_test_pdf(message: Message, state: FSMContext) -> None:
-    if message.text == BTN_BACK:
-        await state.clear()
-        await message.answer("Admin panel", reply_markup=admin_menu())
+    if await handle_admin_menu_button(message, state):
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -104,9 +159,7 @@ async def create_test_pdf(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateTestState.waiting_for_test_code)
 async def create_test_code(message: Message, state: FSMContext) -> None:
-    if message.text == BTN_BACK:
-        await state.clear()
-        await message.answer("Admin panel", reply_markup=admin_menu())
+    if await handle_admin_menu_button(message, state):
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -174,9 +227,7 @@ async def create_test_time_limit(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.message(CreateTestState.waiting_for_question_count)
 async def create_test_question_count(message: Message, state: FSMContext) -> None:
-    if message.text == BTN_BACK:
-        await state.clear()
-        await message.answer("Admin panel", reply_markup=admin_menu())
+    if await handle_admin_menu_button(message, state):
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -210,9 +261,7 @@ async def create_test_question_count(message: Message, state: FSMContext) -> Non
 
 @router.message(CreateTestState.waiting_for_answer)
 async def create_test_answer(message: Message, state: FSMContext) -> None:
-    if message.text == BTN_BACK:
-        await state.clear()
-        await message.answer("Admin panel", reply_markup=admin_menu())
+    if await handle_admin_menu_button(message, state):
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -280,7 +329,9 @@ async def create_test_answer(message: Message, state: FSMContext) -> None:
 
 
 @router.message(F.text == BTN_TEST_LIST)
-async def show_test_list(message: Message) -> None:
+async def show_test_list(message: Message, state: FSMContext) -> None:
+    await state.clear()
+
     if not await is_admin_user(message.from_user.id):
         await message.answer("⛔ Siz admin emassiz.")
         return
@@ -289,7 +340,7 @@ async def show_test_list(message: Message) -> None:
         tests = await TestRepository.get_all(session)
 
     if not tests:
-        await message.answer("📭 Hozircha testlar mavjud emas.")
+        await message.answer("📭 Hozircha testlar mavjud emas.", reply_markup=admin_menu())
         return
 
     await message.answer(
@@ -379,6 +430,7 @@ async def delete_test_yes(callback: CallbackQuery) -> None:
         )
     )
 
+    await callback.message.answer("⚙️ Admin panel", reply_markup=admin_menu())
     await callback.answer("Test o‘chirildi.")
 
 
@@ -424,11 +476,12 @@ async def admin_back(callback: CallbackQuery) -> None:
 
 @router.message(F.text == BTN_RESULTS)
 async def result_start(message: Message, state: FSMContext) -> None:
+    await state.clear()
+
     if not await is_admin_user(message.from_user.id):
         await message.answer("⛔ Siz admin emassiz.")
         return
 
-    await state.clear()
     await state.set_state(AdminResultState.waiting_for_test_code)
 
     await message.answer(
@@ -443,9 +496,7 @@ async def result_start(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminResultState.waiting_for_test_code)
 async def show_results_by_code(message: Message, state: FSMContext) -> None:
-    if message.text == BTN_BACK:
-        await state.clear()
-        await message.answer("Admin panel", reply_markup=admin_menu())
+    if await handle_admin_menu_button(message, state):
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -542,9 +593,7 @@ async def show_student_result_detail(callback: CallbackQuery) -> None:
         else:
             student_answer = item["student_answer"]
 
-        lines.append(
-            f"{item['question']}-savol: {student_answer} {icon}"
-        )
+        lines.append(f"{item['question']}-savol: {student_answer} {icon}")
 
     wrong_items = [item for item in details if not item["is_correct"]]
 
@@ -651,11 +700,12 @@ async def send_results_pdf(callback: CallbackQuery) -> None:
 
 @router.message(F.text == BTN_ADD_ADMIN)
 async def add_admin_start(message: Message, state: FSMContext) -> None:
+    await state.clear()
+
     if not await is_admin_user(message.from_user.id):
         await message.answer("⛔ Siz admin emassiz.")
         return
 
-    await state.clear()
     await state.set_state(ManageAdminState.waiting_for_admin_id)
 
     await message.answer(
@@ -669,9 +719,7 @@ async def add_admin_start(message: Message, state: FSMContext) -> None:
 
 @router.message(ManageAdminState.waiting_for_admin_id)
 async def add_admin_finish(message: Message, state: FSMContext) -> None:
-    if message.text == BTN_BACK:
-        await state.clear()
-        await message.answer("Admin panel", reply_markup=admin_menu())
+    if await handle_admin_menu_button(message, state):
         return
 
     if not await is_admin_user(message.from_user.id):
@@ -689,7 +737,7 @@ async def add_admin_finish(message: Message, state: FSMContext) -> None:
     if new_admin_id in settings.admin_ids:
         await state.clear()
         await message.answer(
-            "⚠️ Bu userni o'chirish mumkin emas",
+            "⚠️ Bu user .env orqali admin qilingan.",
             reply_markup=admin_menu(),
         )
         return
@@ -723,7 +771,9 @@ async def add_admin_finish(message: Message, state: FSMContext) -> None:
 
 
 @router.message(F.text == BTN_ADMIN_LIST)
-async def show_admin_list(message: Message) -> None:
+async def show_admin_list(message: Message, state: FSMContext) -> None:
+    await state.clear()
+
     if not await is_admin_user(message.from_user.id):
         await message.answer("⛔ Siz admin emassiz.")
         return
@@ -754,16 +804,17 @@ async def show_admin_list(message: Message) -> None:
         for index, admin in enumerate(db_admins, start=1):
             lines.append(f"{index}. <code>{admin.telegram_user_id}</code>")
 
-    await message.answer("\n".join(lines))
+    await message.answer("\n".join(lines), reply_markup=admin_menu())
 
 
 @router.message(F.text == BTN_DELETE_ADMIN)
 async def delete_admin_start(message: Message, state: FSMContext) -> None:
+    await state.clear()
+
     if not await is_admin_user(message.from_user.id):
         await message.answer("⛔ Siz admin emassiz.")
         return
 
-    await state.clear()
     await state.set_state(ManageAdminState.waiting_for_delete_admin_id)
 
     await message.answer(
@@ -777,9 +828,7 @@ async def delete_admin_start(message: Message, state: FSMContext) -> None:
 
 @router.message(ManageAdminState.waiting_for_delete_admin_id)
 async def delete_admin_finish(message: Message, state: FSMContext) -> None:
-    if message.text == BTN_BACK:
-        await state.clear()
-        await message.answer("Admin panel", reply_markup=admin_menu())
+    if await handle_admin_menu_button(message, state):
         return
 
     if not await is_admin_user(message.from_user.id):
